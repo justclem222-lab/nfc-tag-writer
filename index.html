@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>NFC Tags</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0f172a;
+    --card: #1a2436;
+    --card-border: #2a3650;
+    --accent: #4f9dff;
+    --accent-press: #3a7fd9;
+    --text: #e8edf7;
+    --text-dim: #8b98b3;
+    --danger: #ff6b6b;
+    --success: #3ecf8e;
+    --warn: #f5b942;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  header {
+    padding: 24px 20px 12px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+  }
+  header p {
+    margin: 4px 0 0;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+  .tabs {
+    display: flex;
+    gap: 6px;
+    padding: 4px;
+    margin: 16px 16px 0;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .tab-btn {
+    flex: 1;
+    background: transparent;
+    color: var(--text-dim);
+    padding: 9px 10px;
+    border-radius: 9px;
+  }
+  .tab-btn.active {
+    background: var(--accent);
+    color: white;
+  }
+  main {
+    padding: 12px 16px 100px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .banner {
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+  .banner-danger { background: #3a1f1f; border: 1px solid #6b3232; color: #ffb4b4; }
+  .banner-info { background: #1c2a3f; border: 1px solid #2f4568; color: #a9c4ee; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .card-title { font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .card-body {
+    color: var(--text-dim);
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .card-meta { color: var(--text-dim); font-size: 12px; }
+  .chip {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #263450;
+    color: var(--text-dim);
+  }
+  .status-line {
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .status-line.done .status-dot { background: var(--success); }
+  .status-line.done { color: var(--success); }
+  .status-line.pending { color: var(--text-dim); }
+  .card-actions { display: flex; gap: 8px; margin-top: 4px; }
+  button {
+    font-family: inherit;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-write { background: var(--accent); color: white; flex: 1; }
+  .btn-write:active { background: var(--accent-press); }
+  .btn-write.writing { background: #26364f; color: var(--text-dim); }
+  .btn-write.success { background: var(--success); color: #06281c; }
+  .btn-write.error { background: var(--danger); color: #3a0d0d; }
+  .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--card-border); }
+  .icon-btn { background: transparent; color: var(--text-dim); padding: 4px 8px; font-size: 18px; line-height: 1; }
+  .empty { text-align: center; color: var(--text-dim); padding: 40px 20px; font-size: 14px; }
+  .fab {
+    position: fixed;
+    right: 20px;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 20px rgba(79,157,255,0.4);
+    z-index: 5;
+  }
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: flex-end;
+    z-index: 10;
+  }
+  .sheet-backdrop.open { display: flex; }
+  .sheet {
+    background: var(--card);
+    border-radius: 20px 20px 0 0;
+    padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .sheet h2 { margin: 0 0 4px; font-size: 18px; }
+  label { font-size: 13px; color: var(--text-dim); display: block; margin-bottom: 4px; }
+  input, textarea, select {
+    width: 100%;
+    background: #101828;
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 15px;
+    font-family: inherit;
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  .field { margin-bottom: 4px; }
+  .row-fields { display: flex; gap: 10px; }
+  .row-fields .field { flex: 1; }
+  .scope-options { display: flex; gap: 8px; }
+  .scope-option {
+    flex: 1;
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .scope-option.selected { border-color: var(--accent); color: var(--text); background: #16233a; }
+  .sheet-actions { display: flex; gap: 10px; margin-top: 8px; }
+  .sheet-actions button { flex: 1; }
+  .status-toast {
+    position: fixed;
+    left: 16px; right: 16px;
+    bottom: calc(90px + env(safe-area-inset-bottom));
+    max-width: 448px;
+    margin: 0 auto;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    text-align: center;
+    display: none;
+    z-index: 20;
+  }
+  .status-toast.show { display: block; }
+
+  /* Tap / log confirmation view */
+  #tapView {
+    display: none;
+    min-height: 100vh;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 24px;
+  }
+  #tapView.active { display: flex; }
+  .tap-emoji { font-size: 64px; margin-bottom: 8px; }
+  .tap-label { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .tap-status { font-size: 15px; color: var(--text-dim); margin-bottom: 4px; }
+  .tap-status.ok { color: var(--success); }
+  .tap-status.err { color: var(--danger); }
+  .tap-prev { font-size: 13px; color: var(--text-dim); margin-bottom: 28px; }
+  .tap-actions { display: flex; gap: 10px; width: 100%; max-width: 320px; }
+  .tap-actions button { flex: 1; }
+</style>
+</head>
+<body>
+
+<div id="tapView">
+  <div class="tap-emoji" id="tapEmoji">⏳</div>
+  <div class="tap-label" id="tapLabel">Logging…</div>
+  <div class="tap-status" id="tapStatus">Saving…</div>
+  <div class="tap-prev" id="tapPrev"></div>
+  <div class="tap-actions">
+    <button class="btn-ghost" id="tapRetryBtn" style="display:none;">Retry</button>
+    <button class="btn-write" id="tapDoneBtn">Done</button>
+  </div>
+</div>
+
+<div id="appView">
+
+<header>
+  <h1>NFC Tags</h1>
+  <p>Program a sticker once, tap it any time.</p>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn" id="tabMessagesBtn">Messages</button>
+  <button class="tab-btn" id="tabRemindersBtn">Reminders</button>
+</div>
+
+<main>
+  <div id="unsupported" class="banner banner-danger" style="display:none;"></div>
+
+  <div id="messagesPanel" class="panel">
+    <div id="presetList"></div>
+    <div id="messagesEmpty" class="empty" style="display:none;">No presets yet. Tap + to add your first one.</div>
+  </div>
+
+  <div id="remindersPanel" class="panel">
+    <div id="localModeBanner" class="banner banner-info" style="display:none;">
+      Shared tasks are only logging on this device. Add your Supabase URL and key to the CONFIG block at the top of index.html to sync across phones.
+    </div>
+    <div id="notifyBar" class="card" style="display:none; flex-direction:row; align-items:center; justify-content:space-between; gap:12px;">
+      <span id="notifyStatus" class="card-meta"></span>
+      <button class="btn-write" id="notifyBtn" style="flex:0 0 auto;">Enable</button>
+    </div>
+    <div id="taskList"></div>
+    <div id="tasksEmpty" class="empty" style="display:none;">No reminders yet. Tap + to add one — e.g. "Fed the cat" or "Took my pill".</div>
+  </div>
+</main>
+
+<button class="fab" id="addBtn" aria-label="Add">+</button>
+
+<!-- Message preset sheet -->
+<div class="sheet-backdrop" id="messageSheetBackdrop">
+  <div class="sheet">
+    <h2 id="messageSheetTitle">New preset</h2>
+    <div class="field">
+      <label for="fName">Name</label>
+      <input id="fName" placeholder="e.g. Running late">
+    </div>
+    <div class="field">
+      <label for="fPhone">Phone number (optional)</label>
+      <input id="fPhone" placeholder="Leave blank to pick a contact when it's sent" inputmode="tel">
+    </div>
+    <div class="field">
+      <label for="fMessage">Message</label>
+      <textarea id="fMessage" placeholder="Running about 10 min late, sorry!"></textarea>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" id="messageCancelBtn">Cancel</button>
+      <button class="btn-write" id="messageSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reminder task sheet -->
+<div class="sheet-backdrop" id="taskSheetBackdrop">
+  <div class="sheet">
+    <h2 id="taskSheetTitle">New reminder</h2>
+    <div class="row-fields">
+      <div class="field" style="flex:0 0 70px;">
+        <label for="rEmoji">Emoji</label>
+        <input id="rEmoji" maxlength="4" placeholder="✅">
+      </div>
+      <div class="field">
+        <label for="rName">Task</label>
+        <input id="rName" placeholder="e.g. Fed the cat">
+      </div>
+    </div>
+    <div class="field">
+      <label>Who can see it</label>
+      <div class="scope-options">
+        <div class="scope-option" id="scopeSharedOpt" data-scope="shared">Shared<br><span style="font-size:11px;">Any phone that taps it</span></div>
+        <div class="scope-option" id="scopeLocalOpt" data-scope="local">This device only<br><span style="font-size:11px;">Private to this phone</span></div>
+      </div>
+    </div>
+    <div class="field">
+      <label style="display:flex; align-items:center; gap:8px; color:var(--text);">
+        <input type="checkbox" id="rAlertEnabled" style="width:auto;">
+        Remind me if not done by
+        <input id="rAlertTime" type="time" value="18:00" style="width:auto; flex:0 0 auto;">
+      </label>
+      <div class="card-meta" id="alertHint" style="margin-top:4px;"></div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" id="taskCancelBtn">Cancel</button>
+      <button class="btn-write" id="taskSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="status-toast" id="statusToast"></div>
+
+</div><!-- #appView -->
+
+<script>
+/* ---------- CONFIG ----------
+   Optional: paste your Supabase project URL + anon key here to sync
+   "Shared" reminders across phones (e.g. so you can see your daughter
+   tapped hers). Leave blank to keep everything local-only on this device.
+   You can reuse the same Supabase project as the Swear Jar app — just
+   run schema.sql from this folder against it to add the `logs` table. */
+const SUPABASE_URL = '';
+const SUPABASE_ANON_KEY = '';
+/* Public VAPID key for push notifications (missed-reminder alerts).
+   Generate a keypair, paste the public half here, and paste the private
+   half into the check-reminders Edge Function's secrets — never here.
+   See SUPABASE_SETUP.md. */
+const VAPID_PUBLIC_KEY = '';
+const SUPA_READY = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+/* Must match TIMEZONE in supabase/functions/check-reminders/index.ts */
+const TIMEZONE_LABEL = 'Australia/Sydney';
+
+const MSG_STORAGE_KEY = 'nfc_text_presets';
+const TASK_STORAGE_KEY = 'nfc_reminder_tasks';
+const LOCAL_LOGS_KEY = 'nfc_reminder_local_logs'; // { taskId: [isoString, ...] }
+
+let presets = [];
+let editingPresetId = null;
+let tasks = [];
+let editingTaskId = null;
+let selectedScope = 'shared';
+
+/* ---------- shared helpers ---------- */
+
+function toast(msg, ms = 2200) {
+  const el = document.getElementById('statusToast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+async function writeUrlTag(uri, btn) {
+  if (!('NDEFReader' in window)) {
+    toast('NFC writing needs Chrome on Android with NFC turned on');
+    return;
+  }
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Hold tag to phone…';
+  btn.classList.add('writing');
+  try {
+    const ndef = new NDEFReader();
+    await ndef.write({ records: [{ recordType: 'url', data: uri }] });
+    btn.textContent = 'Written!';
+    btn.classList.remove('writing');
+    btn.classList.add('success');
+  } catch (err) {
+    btn.textContent = err.name === 'NotAllowedError' ? 'NFC permission denied' : 'Failed - try again';
+    btn.classList.remove('writing');
+    btn.classList.add('error');
+  } finally {
+    setTimeout(() => {
+      btn.textContent = originalLabel;
+      btn.classList.remove('success', 'error');
+    }, 2000);
+  }
+}
+
+function checkSupport() {
+  const box = document.getElementById('unsupported');
+  if (!('NDEFReader' in window)) {
+    box.style.display = 'block';
+    box.textContent = "This browser doesn't support NFC writing. Open this page in Chrome on an NFC-capable Android phone, with NFC turned on in Settings.";
+  }
+}
+
+/* ---------- tabs ---------- */
+
+function setTab(name) {
+  document.getElementById('tabMessagesBtn').classList.toggle('active', name === 'messages');
+  document.getElementById('tabRemindersBtn').classList.toggle('active', name === 'reminders');
+  document.getElementById('messagesPanel').classList.toggle('active', name === 'messages');
+  document.getElementById('remindersPanel').classList.toggle('active', name === 'reminders');
+  document.getElementById('addBtn').dataset.mode = name;
+  localStorage.setItem('nfc_active_tab', name);
+}
+
+/* ================= MESSAGES ================= */
+
+function loadPresets() {
+  try { presets = JSON.parse(localStorage.getItem(MSG_STORAGE_KEY)) || []; } catch { presets = []; }
+}
+function savePresets() { localStorage.setItem(MSG_STORAGE_KEY, JSON.stringify(presets)); }
+
+function renderMessages() {
+  const list = document.getElementById('presetList');
+  const empty = document.getElementById('messagesEmpty');
+  list.innerHTML = '';
+  empty.style.display = presets.length ? 'none' : 'block';
+
+  presets.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-head">
+        <div>
+          <div class="card-title">${escapeHtml(p.name)}</div>
+          <div class="card-meta">${p.phone ? escapeHtml(p.phone) : 'Recipient chosen when sent'}</div>
+        </div>
+        <button class="icon-btn" data-edit="${p.id}" aria-label="Edit">&#9998;</button>
+      </div>
+      <div class="card-body">${escapeHtml(p.message)}</div>
+      <div class="card-actions">
+        <button class="btn-write" data-write="${p.id}">Write to tag</button>
+        <button class="btn-ghost" data-delete="${p.id}">Delete</button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function openMessageSheet(preset) {
+  editingPresetId = preset ? preset.id : null;
+  document.getElementById('messageSheetTitle').textContent = preset ? 'Edit preset' : 'New preset';
+  document.getElementById('fName').value = preset ? preset.name : '';
+  document.getElementById('fPhone').value = preset ? (preset.phone || '') : '';
+  document.getElementById('fMessage').value = preset ? preset.message : '';
+  document.getElementById('messageSheetBackdrop').classList.add('open');
+}
+function closeMessageSheet() { document.getElementById('messageSheetBackdrop').classList.remove('open'); }
+
+document.getElementById('messageCancelBtn').addEventListener('click', closeMessageSheet);
+document.getElementById('messageSheetBackdrop').addEventListener('click', e => {
+  if (e.target.id === 'messageSheetBackdrop') closeMessageSheet();
+});
+document.getElementById('messageSaveBtn').addEventListener('click', () => {
+  const name = document.getElementById('fName').value.trim();
+  const phone = document.getElementById('fPhone').value.trim();
+  const message = document.getElementById('fMessage').value.trim();
+  if (!name || !message) { toast('Name and message are required'); return; }
+  if (editingPresetId) {
+    Object.assign(presets.find(x => x.id === editingPresetId), { name, phone, message });
+  } else {
+    presets.push({ id: crypto.randomUUID(), name, phone, message });
+  }
+  savePresets();
+  renderMessages();
+  closeMessageSheet();
+});
+
+document.getElementById('presetList').addEventListener('click', (e) => {
+  const editId = e.target.dataset.edit;
+  const delId = e.target.dataset.delete;
+  const writeId = e.target.dataset.write;
+  if (editId) {
+    openMessageSheet(presets.find(p => p.id === editId));
+  } else if (delId) {
+    if (confirm('Delete this preset?')) {
+      presets = presets.filter(p => p.id !== delId);
+      savePresets();
+      renderMessages();
+    }
+  } else if (writeId) {
+    const preset = presets.find(p => p.id === writeId);
+    const uri = 'sms:' + encodeURIComponent(preset.phone || '') + '?body=' + encodeURIComponent(preset.message);
+    writeUrlTag(uri, e.target);
+  }
+});
+
+/* ================= REMINDERS ================= */
+
+function loadTasks() {
+  try { tasks = JSON.parse(localStorage.getItem(TASK_STORAGE_KEY)) || []; } catch { tasks = []; }
+}
+function saveTasks() { localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(tasks)); }
+
+function loadLocalLogs() {
+  try { return JSON.parse(localStorage.getItem(LOCAL_LOGS_KEY)) || {}; } catch { return {}; }
+}
+function saveLocalLogs(logs) { localStorage.setItem(LOCAL_LOGS_KEY, JSON.stringify(logs)); }
+
+function startOfTodayISO() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+function formatTime(iso) {
+  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function taskUrl(task) {
+  const u = new URL(location.href);
+  u.search = '';
+  u.searchParams.set('log', task.id);
+  u.searchParams.set('label', task.label);
+  u.searchParams.set('emoji', task.emoji || '✅');
+  u.searchParams.set('scope', task.scope);
+  return u.toString();
+}
+
+async function fetchLastSharedLog(taskId, sinceISO) {
+  const url = `${SUPABASE_URL}/rest/v1/logs?task_id=eq.${encodeURIComponent(taskId)}` +
+    (sinceISO ? `&logged_at=gte.${encodeURIComponent(sinceISO)}` : '') +
+    `&order=logged_at.desc&limit=1&select=logged_at`;
+  const res = await fetch(url, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+  });
+  if (!res.ok) throw new Error('fetch failed');
+  const rows = await res.json();
+  return rows[0] ? rows[0].logged_at : null;
+}
+
+async function insertSharedLog(taskId, label, emoji) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/logs`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal'
+    },
+    body: JSON.stringify({ task_id: taskId, label, emoji, logged_at: new Date().toISOString() })
+  });
+  if (!res.ok) throw new Error('insert failed');
+}
+
+async function upsertSharedTask(task) {
+  if (!SUPA_READY) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/tasks?on_conflict=id`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify({
+        id: task.id,
+        label: task.label,
+        emoji: task.emoji,
+        alert_enabled: !!task.alertEnabled,
+        alert_time: task.alertEnabled ? task.alertTime : null
+      })
+    });
+  } catch {
+    toast('Saved on this phone, but could not sync to Supabase');
+  }
+}
+
+async function deleteSharedTask(taskId) {
+  if (!SUPA_READY) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${encodeURIComponent(taskId)}`, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+    });
+  } catch {}
+}
+
+/* ---------- push notifications (missed-reminder alerts) ---------- */
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+async function getExistingSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+
+async function renderNotifyBar() {
+  const bar = document.getElementById('notifyBar');
+  if (!SUPA_READY || !VAPID_PUBLIC_KEY || !('PushManager' in window)) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'flex';
+  const status = document.getElementById('notifyStatus');
+  const btn = document.getElementById('notifyBtn');
+  const sub = await getExistingSubscription();
+  if (sub) {
+    status.textContent = 'Notifications on for this phone';
+    btn.textContent = 'Disable';
+    btn.dataset.action = 'disable';
+  } else {
+    status.textContent = 'Notifications off for this phone';
+    btn.textContent = 'Enable';
+    btn.dataset.action = 'enable';
+  }
+}
+
+async function enablePush() {
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { toast('Notification permission denied'); return; }
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+  });
+  const json = sub.toJSON();
+  await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=ignore-duplicates,return=minimal'
+    },
+    body: JSON.stringify({ endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth })
+  });
+  toast('Notifications enabled on this phone');
+  renderNotifyBar();
+}
+
+async function disablePush() {
+  const sub = await getExistingSubscription();
+  if (sub) {
+    await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}`, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+    });
+    await sub.unsubscribe();
+  }
+  toast('Notifications turned off on this phone');
+  renderNotifyBar();
+}
+
+document.getElementById('notifyBtn').addEventListener('click', (e) => {
+  if (e.target.dataset.action === 'disable') disablePush();
+  else enablePush();
+});
+
+async function renderTasks() {
+  const list = document.getElementById('taskList');
+  const empty = document.getElementById('tasksEmpty');
+  const banner = document.getElementById('localModeBanner');
+  banner.style.display = (!SUPA_READY && tasks.some(t => t.scope === 'shared')) ? 'block' : 'none';
+  list.innerHTML = '';
+  empty.style.display = tasks.length ? 'none' : 'block';
+
+  const localLogs = loadLocalLogs();
+  const todayStart = startOfTodayISO();
+
+  for (const t of tasks) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-head">
+        <div>
+          <div class="card-title">${t.emoji || '✅'} ${escapeHtml(t.label)}</div>
+          <span class="chip">${t.scope === 'shared' ? 'Shared' : 'This device'}</span>
+          ${t.alertEnabled ? `<span class="chip">⏰ ${escapeHtml(t.alertTime || '')}</span>` : ''}
+        </div>
+        <button class="icon-btn" data-edit-task="${t.id}" aria-label="Edit">&#9998;</button>
+      </div>
+      <div class="status-line pending" data-status="${t.id}">
+        <span class="status-dot"></span><span>Checking…</span>
+      </div>
+      <div class="card-actions">
+        <button class="btn-write" data-write-task="${t.id}">Write to tag</button>
+        <button class="btn-ghost" data-delete-task="${t.id}">Delete</button>
+      </div>
+    `;
+    list.appendChild(card);
+
+    (async () => {
+      const statusEl = card.querySelector(`[data-status="${t.id}"]`);
+      let lastToday = null;
+      try {
+        if (t.scope === 'shared' && SUPA_READY) {
+          lastToday = await fetchLastSharedLog(t.id, todayStart);
+        } else {
+          lastToday = (localLogs[t.id] || []).filter(iso => iso >= todayStart).sort().pop() || null;
+        }
+      } catch {
+        statusEl.innerHTML = `<span class="status-dot"></span><span>Couldn't check status</span>`;
+        return;
+      }
+      if (lastToday) {
+        statusEl.classList.remove('pending');
+        statusEl.classList.add('done');
+        statusEl.innerHTML = `<span class="status-dot"></span><span>Done today at ${formatTime(lastToday)}</span>`;
+      } else {
+        statusEl.innerHTML = `<span class="status-dot"></span><span>Not logged today</span>`;
+      }
+    })();
+  }
+}
+
+function updateAlertAvailability() {
+  const checkbox = document.getElementById('rAlertEnabled');
+  const time = document.getElementById('rAlertTime');
+  const hint = document.getElementById('alertHint');
+  const available = selectedScope === 'shared' && SUPA_READY && VAPID_PUBLIC_KEY;
+  checkbox.disabled = !available;
+  time.disabled = !available;
+  if (!available) checkbox.checked = false;
+  if (selectedScope !== 'shared') {
+    hint.textContent = 'Alerts need "Shared" — a per-device task has nowhere to check from.';
+  } else if (!SUPA_READY || !VAPID_PUBLIC_KEY) {
+    hint.textContent = 'Alerts need Supabase and a VAPID key set up first — see SUPABASE_SETUP.md.';
+  } else {
+    hint.textContent = `Checked roughly every 15 min, ${TIMEZONE_LABEL} time.`;
+  }
+}
+
+function setScope(scope) {
+  selectedScope = scope;
+  document.getElementById('scopeSharedOpt').classList.toggle('selected', scope === 'shared');
+  document.getElementById('scopeLocalOpt').classList.toggle('selected', scope === 'local');
+  updateAlertAvailability();
+}
+document.getElementById('scopeSharedOpt').addEventListener('click', () => setScope('shared'));
+document.getElementById('scopeLocalOpt').addEventListener('click', () => setScope('local'));
+
+function openTaskSheet(task) {
+  editingTaskId = task ? task.id : null;
+  document.getElementById('taskSheetTitle').textContent = task ? 'Edit reminder' : 'New reminder';
+  document.getElementById('rName').value = task ? task.label : '';
+  document.getElementById('rEmoji').value = task ? (task.emoji || '') : '';
+  document.getElementById('rAlertEnabled').checked = task ? !!task.alertEnabled : false;
+  document.getElementById('rAlertTime').value = task && task.alertTime ? task.alertTime : '18:00';
+  setScope(task ? task.scope : 'shared');
+  document.getElementById('taskSheetBackdrop').classList.add('open');
+}
+function closeTaskSheet() { document.getElementById('taskSheetBackdrop').classList.remove('open'); }
+
+document.getElementById('taskCancelBtn').addEventListener('click', closeTaskSheet);
+document.getElementById('taskSheetBackdrop').addEventListener('click', e => {
+  if (e.target.id === 'taskSheetBackdrop') closeTaskSheet();
+});
+document.getElementById('taskSaveBtn').addEventListener('click', () => {
+  const label = document.getElementById('rName').value.trim();
+  const emoji = document.getElementById('rEmoji').value.trim();
+  const alertEnabled = document.getElementById('rAlertEnabled').checked;
+  const alertTime = document.getElementById('rAlertTime').value || '18:00';
+  if (!label) { toast('Give the reminder a name'); return; }
+  let task;
+  if (editingTaskId) {
+    task = tasks.find(x => x.id === editingTaskId);
+    Object.assign(task, { label, emoji, scope: selectedScope, alertEnabled, alertTime });
+  } else {
+    task = { id: crypto.randomUUID().slice(0, 8), label, emoji, scope: selectedScope, alertEnabled, alertTime };
+    tasks.push(task);
+  }
+  saveTasks();
+  if (task.scope === 'shared') upsertSharedTask(task);
+  renderTasks();
+  closeTaskSheet();
+});
+
+document.getElementById('taskList').addEventListener('click', (e) => {
+  const editId = e.target.dataset.editTask;
+  const delId = e.target.dataset.deleteTask;
+  const writeId = e.target.dataset.writeTask;
+  if (editId) {
+    openTaskSheet(tasks.find(t => t.id === editId));
+  } else if (delId) {
+    if (confirm('Delete this reminder? Existing tags will stop working.')) {
+      const removed = tasks.find(t => t.id === delId);
+      tasks = tasks.filter(t => t.id !== delId);
+      saveTasks();
+      if (removed && removed.scope === 'shared') deleteSharedTask(delId);
+      renderTasks();
+    }
+  } else if (writeId) {
+    const task = tasks.find(t => t.id === writeId);
+    writeUrlTag(taskUrl(task), e.target);
+  }
+});
+
+/* ---------- + button routes to whichever tab is active ---------- */
+document.getElementById('addBtn').addEventListener('click', () => {
+  if (document.getElementById('addBtn').dataset.mode === 'reminders') {
+    openTaskSheet(null);
+  } else {
+    openMessageSheet(null);
+  }
+});
+
+document.getElementById('tabMessagesBtn').addEventListener('click', () => setTab('messages'));
+document.getElementById('tabRemindersBtn').addEventListener('click', () => setTab('reminders'));
+
+/* ================= TAP / LOG VIEW ================= */
+
+async function runTapLog(taskId, label, emoji, scope) {
+  const statusEl = document.getElementById('tapStatus');
+  const prevEl = document.getElementById('tapPrev');
+  const retryBtn = document.getElementById('tapRetryBtn');
+  statusEl.textContent = 'Saving…';
+  statusEl.className = 'tap-status';
+  retryBtn.style.display = 'none';
+  prevEl.textContent = '';
+
+  const nowISO = new Date().toISOString();
+  try {
+    if (scope === 'shared' && SUPA_READY) {
+      const prev = await fetchLastSharedLog(taskId, null);
+      await insertSharedLog(taskId, label, emoji);
+      prevEl.textContent = prev ? `Previous: ${new Date(prev).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}` : 'First time logging this';
+    } else {
+      const logs = loadLocalLogs();
+      const arr = logs[taskId] || [];
+      const prev = arr.length ? arr[arr.length - 1] : null;
+      arr.push(nowISO);
+      logs[taskId] = arr;
+      saveLocalLogs(logs);
+      prevEl.textContent = prev ? `Previous: ${new Date(prev).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}` : 'First time logging this';
+    }
+    statusEl.textContent = `Logged at ${formatTime(nowISO)}`;
+    statusEl.classList.add('ok');
+  } catch (err) {
+    statusEl.textContent = "Couldn't save — check your connection";
+    statusEl.classList.add('err');
+    retryBtn.style.display = 'block';
+  }
+}
+
+function showTapView(params) {
+  const taskId = params.get('log');
+  const label = params.get('label') || taskId;
+  const emoji = params.get('emoji') || '✅';
+  const scope = params.get('scope') || 'local';
+
+  document.getElementById('appView').style.display = 'none';
+  document.getElementById('tapView').classList.add('active');
+  document.getElementById('tapEmoji').textContent = emoji;
+  document.getElementById('tapLabel').textContent = label;
+  document.getElementById('tapRetryBtn').addEventListener('click', () => runTapLog(taskId, label, emoji, scope));
+  document.getElementById('tapDoneBtn').addEventListener('click', () => {
+    location.href = location.pathname;
+  });
+  runTapLog(taskId, label, emoji, scope);
+}
+
+/* ================= BOOT ================= */
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+const params = new URLSearchParams(location.search);
+if (params.has('log')) {
+  showTapView(params);
+} else {
+  loadPresets();
+  renderMessages();
+  loadTasks();
+  renderTasks();
+  renderNotifyBar();
+  checkSupport();
+  setTab(localStorage.getItem('nfc_active_tab') || 'messages');
+}
+</script>
+</body>
+</html>
