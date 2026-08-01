@@ -248,6 +248,30 @@
   .tap-prev { font-size: 13px; color: var(--text-dim); margin-bottom: 28px; }
   .tap-actions { display: flex; gap: 10px; width: 100%; max-width: 320px; }
   .tap-actions button { flex: 1; }
+
+  /* Scan / debug view */
+  #scanView {
+    display: none;
+    min-height: 100vh;
+    padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  #scanView.active { display: block; }
+  #scanView h2 { margin: 8px 0 4px; font-size: 20px; }
+  #scanStatus { color: var(--text-dim); font-size: 14px; margin-bottom: 16px; }
+  #scanResults .card-meta { font-weight: 600; color: var(--text); }
+  #scanResults .card-body { word-break: break-all; }
+  .scan-link {
+    display: block;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    margin: 10px auto 0;
+    background: none;
+    text-decoration: underline;
+    padding: 4px;
+  }
 </style>
 </head>
 <body>
@@ -263,6 +287,15 @@
   </div>
 </div>
 
+<div id="scanView">
+  <h2>Scan a tag</h2>
+  <div id="scanStatus">Hold a tag to your phone…</div>
+  <div id="scanResults"></div>
+  <div class="tap-actions" style="margin-top:16px;">
+    <button class="btn-ghost" id="scanCloseBtn">Close</button>
+  </div>
+</div>
+
 <div id="appView">
 
 <header>
@@ -274,6 +307,7 @@
   <button class="tab-btn" id="tabMessagesBtn">Messages</button>
   <button class="tab-btn" id="tabRemindersBtn">Reminders</button>
 </div>
+<button class="scan-link" id="scanDebugBtn">Not working? Scan a tag to see what's actually on it</button>
 
 <main>
   <div id="unsupported" class="banner banner-danger" style="display:none;"></div>
@@ -435,9 +469,76 @@ function checkSupport() {
   const box = document.getElementById('unsupported');
   if (!('NDEFReader' in window)) {
     box.style.display = 'block';
-    box.textContent = "This browser doesn't support NFC writing. Open this page in Chrome on an NFC-capable Android phone, with NFC turned on in Settings.";
+    box.textContent = "This browser app can't do NFC writing at all, regardless of any settings — Web NFC isn't supported here. Brave, Firefox and Safari don't support it. Open this exact page in Samsung Internet, Chrome, or Edge instead.";
   }
 }
+
+/* ---------- scan / debug ---------- */
+
+function decodeRecord(record) {
+  try {
+    if (record.recordType === 'url' || record.recordType === 'text') {
+      const decoder = new TextDecoder(record.encoding || 'utf-8');
+      return { type: record.recordType === 'url' ? 'Link' : 'Text', value: decoder.decode(record.data) };
+    }
+    if (record.recordType === 'android.com:pkg') {
+      const decoder = new TextDecoder();
+      return { type: 'Android app record — force-opens this app, ignoring everything else on the tag', value: decoder.decode(record.data) };
+    }
+    return {
+      type: record.recordType || record.mediaType || 'Unknown record type',
+      value: record.data ? `(${record.data.byteLength} bytes of binary data)` : '(empty)'
+    };
+  } catch (err) {
+    return { type: record.recordType || 'Unknown', value: `(couldn't decode: ${err.message})` };
+  }
+}
+
+async function startScan() {
+  if (!('NDEFReader' in window)) {
+    toast("This browser can't scan either — needs Samsung Internet, Chrome, or Edge");
+    return;
+  }
+  document.getElementById('appView').style.display = 'none';
+  document.getElementById('scanView').classList.add('active');
+  document.getElementById('scanStatus').textContent = 'Hold a tag to your phone…';
+  document.getElementById('scanResults').innerHTML = '';
+
+  try {
+    const ndef = new NDEFReader();
+    await ndef.scan();
+    ndef.onreading = (event) => {
+      const results = document.getElementById('scanResults');
+      document.getElementById('scanStatus').textContent =
+        `Tag read (serial ${event.serialNumber || 'unknown'}) — ${event.message.records.length} record(s) on it:`;
+      results.innerHTML = '';
+      if (event.message.records.length === 0) {
+        results.innerHTML = '<div class="card"><div class="card-body">Tag is blank — no records at all.</div></div>';
+      }
+      event.message.records.forEach((record) => {
+        const d = decodeRecord(record);
+        const row = document.createElement('div');
+        row.className = 'card';
+        row.innerHTML = `<div class="card-meta">${escapeHtml(d.type)}</div><div class="card-body">${escapeHtml(d.value)}</div>`;
+        results.appendChild(row);
+      });
+    };
+    ndef.onreadingerror = () => {
+      document.getElementById('scanStatus').textContent = "Couldn't read that tag cleanly — hold it steadier against the back of the phone and it'll retry automatically.";
+    };
+  } catch (err) {
+    document.getElementById('scanStatus').textContent =
+      err.name === 'NotAllowedError' ? 'NFC permission denied for this browser.' : `Couldn't start scanning (${err.message || err.name}).`;
+  }
+}
+
+function closeScan() {
+  document.getElementById('scanView').classList.remove('active');
+  document.getElementById('appView').style.display = '';
+}
+
+document.getElementById('scanDebugBtn').addEventListener('click', startScan);
+document.getElementById('scanCloseBtn').addEventListener('click', closeScan);
 
 /* ---------- tabs ---------- */
 
